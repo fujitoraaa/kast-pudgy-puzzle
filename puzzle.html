@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Puzzle Game - KAST x Pudgy</title>
+    <style>
+        /* CSS Reset & Optimization */
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-font-smoothing: antialiased; }
+        body, html { 
+            width: 100vw; height: 100vh; overflow: hidden; 
+            background: linear-gradient(180deg, #c3d3fb 0%, #a2bdf8 100%); 
+            font-family: 'Arial Rounded MT Bold', 'Nunito', sans-serif; 
+        }
+        #snow-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+
+        /* HEADER & PROFILE */
+        .header { position: absolute; top: 25px; left: 40px; z-index: 110; display: flex; align-items: center; gap: 15px; text-decoration: none; cursor: pointer; }
+        .header img { height: 35px; width: auto; }
+        .header .cross { font-size: 18px; font-weight: 900; color: #111; }
+        
+        .top-right-menu { position: absolute; top: 20px; right: 40px; display: flex; align-items: center; gap: 15px; z-index: 110; }
+        .user-name-display { font-size: 18px; font-weight: 900; color: #1b274f; text-transform: uppercase; }
+        .profile-btn { width: 55px; height: 55px; border-radius: 50%; background: #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.1); overflow: hidden; }
+
+        /* LAYOUT CHÍNH */
+        .game-container { display: flex; width: 95vw; height: 80vh; margin: 10vh auto; gap: 20px; z-index: 10; position: relative; }
+
+        /* KHU VỰC CHƠI (80%) */
+        .puzzle-area { 
+            flex: 8; position: relative; background: rgba(255, 255, 255, 0.2); 
+            border-radius: 25px; border: 3px dashed rgba(255, 255, 255, 0.5);
+            display: flex; justify-content: center; align-items: center;
+            overflow: hidden; /* Ngăn mảnh ghép bay ra ngoài */
+        }
+
+        #drop-grid { display: grid; background: rgba(27, 39, 79, 0.05); border: 4px solid #fff; box-shadow: 0 0 20px rgba(0,0,0,0.1); }
+        .grid-slot { border: 1px solid rgba(255, 255, 255, 0.3); }
+
+        /* Sidebar (20%) chia 35/65 */
+        .side-column { flex: 2; display: flex; flex-direction: column; gap: 15px; }
+        .preview-box { flex: 3.5; background: #fff; border-radius: 15px; padding: 10px; display: flex; flex-direction: column; align-items: center; box-shadow: 0 8px 20px rgba(0,0,0,0.1); }
+        .preview-box img { width: 100%; height: 100%; border-radius: 10px; object-fit: cover; }
+        .preview-label { font-size: 14px; font-weight: bold; color: #1b274f; margin-bottom: 5px; }
+
+        .timer-box { flex: 6.5; background: #1b274f; border-radius: 15px; display: flex; flex-direction: column; justify-content: center; align-items: center; color: #fff; box-shadow: 0 8px 20px rgba(0,0,0,0.2); }
+        .timer-val { font-size: 70px; color: #ffcc00; font-weight: 900; }
+        .round-info { font-size: 18px; font-weight: bold; margin-bottom: 10px; color: #a2bdf8; }
+
+        /* MẢNH GHÉP (GPU Optimized) */
+        .puzzle-piece { 
+            position: absolute; cursor: grab; z-index: 50; 
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3); border-radius: 5px;
+            will-change: transform; transform: translate3d(0,0,0); /* Ép dùng GPU */
+            touch-action: none;
+        }
+        .puzzle-piece:active { cursor: grabbing; z-index: 1000; transform: scale(1.05) translate3d(0,0,0); }
+        .puzzle-piece.placed { cursor: default; box-shadow: none; border: 0.5px solid rgba(255,255,255,0.2); pointer-events: none; z-index: 1; }
+
+        /* MODALS */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(27,39,79,0.92); z-index: 2000; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
+        .modal-content { background: #fff; padding: 40px; border-radius: 25px; text-align: center; width: 400px; box-shadow: 0 20px 50px rgba(0,0,0,0.3); }
+        .modal-btn { padding: 14px 28px; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; margin: 10px 5px; color: #fff; text-decoration: none; display: inline-block; font-size: 16px; transition: 0.2s; }
+        .modal-btn:hover { opacity: 0.9; transform: scale(1.03); }
+
+        .lb-fixed { position: absolute; bottom: 30px; left: 40px; z-index: 110; }
+        .lb-fixed a { font-size: 20px; font-weight: 900; color: #1b274f; text-decoration: none; text-transform: uppercase; }
+
+        /* Loading Screen */
+        #loader { position: fixed; top:0; left:0; width:100%; height:100%; background:#c3d3fb; z-index:9999; display:flex; justify-content:center; align-items:center; flex-direction:column; }
+        .spinner { width:40px; height:40px; border:4px solid #1b274f; border-top-color:transparent; border-radius:50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+    <div id="loader"><div class="spinner"></div><p style="margin-top:15px; font-weight:bold; color:#1b274f;">UPLOADING ASSETS...</p></div>
+
+    <canvas id="snow-canvas"></canvas>
+
+    <a href="index.html" class="header">
+        <img src="Kast dark logo.png" alt="Kast">
+        <span class="cross">✕</span>
+        <img src="pudgy penguins logo.png" alt="Pudgy Penguins">
+    </a>
+
+    <div class="top-right-menu">
+        <div class="user-name-display" id="user-name-display"></div>
+        <div class="profile-btn"><img id="user-avatar" src="" style="width:100%; height:100%; object-fit:cover;"></div>
+    </div>
+
+    <div class="lb-fixed"><a href="leaderboard.html">LEADERBOARD</a></div>
+
+    <div class="game-container">
+        <div class="puzzle-area" id="puzzle-area">
+            <div id="drop-grid"></div>
+        </div>
+
+        <div class="side-column">
+            <div class="preview-box">
+                <span class="preview-label">TARGET IMAGE</span>
+                <img id="target-preview" src="" alt="Target">
+            </div>
+            <div class="timer-box">
+                <div class="round-info">ROUND <span id="cur-round">1</span>/5</div>
+                <div class="timer-val" id="timer-txt">60</div>
+                <span>Seconds</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL ROUND COMPLETE (1-4) -->
+    <div class="modal" id="modal-round-complete">
+        <div class="modal-content">
+            <h2 id="rc-title" style="color:#1b274f; font-size: 28px;">Round Complete</h2>
+            <div style="margin: 25px 0;">
+                <p style="font-size: 18px; color: #666; font-weight: bold;">Time</p>
+                <p id="rc-time" style="font-size: 45px; font-weight: 900; color: #ff9f43;">0s</p>
+            </div>
+            <button class="modal-btn" style="background:#1b274f; width: 100%;" onclick="nextRound()">NEXT</button>
+        </div>
+    </div>
+
+    <!-- MODAL WIN (ROUND 5) -->
+    <div class="modal" id="modal-win">
+        <div class="modal-content">
+            <h2 style="color:#1dd1a1">MISSION COMPLETE! 🎉</h2>
+            <p id="win-msg" style="margin:15px 0; font-weight: bold;"></p>
+            <button class="modal-btn" style="background:#1dd1a1" onclick="location.reload()">Chơi lại</button>
+            <a href="leaderboard.html" class="modal-btn" style="background:#54a0ff">Leaderboard</a>
+            <a href="index.html" class="modal-btn" style="background:#ff4757">Back Home</a>
+        </div>
+    </div>
+
+    <!-- MODAL LOSE -->
+    <div class="modal" id="modal-lose">
+        <div class="modal-content">
+            <h2 style="color:#ff4757">MISSION FAILED! 😭</h2>
+            <p style="margin:15px 0; font-weight: bold;">Bạn đã hết thời gian mất rồi...</p>
+            <button class="modal-btn" style="background:#1dd1a1" onclick="location.reload()">Thử lại</button>
+            <a href="leaderboard.html" class="modal-btn" style="background:#54a0ff">Leaderboard</a>
+            <a href="index.html" class="modal-btn" style="background:#ff4757">Back Home</a>
+        </div>
+    </div>
+
+    <script>
+        const ROUND_CONFIGS = [
+            { img: 'puzzle-target.jpg', grid: [2, 2], fakes: 0 },
+            { img: 'fake1.jpg', grid: [3, 3], fakes: 0 },
+            { img: 'fake2.jpg', grid: [3, 4], fakes: 4 },
+            { img: 'fake3.jpg', grid: [4, 4], fakes: 8 },
+            { img: 'fake4.jpg', grid: [5, 5], fakes: 12 }
+        ];
+
+        let currentIdx = 0, timeLeft = 60, timer, totalTimeUsed = 0, correctPiecesCount = 0, piecesPlaced = 0;
+
+        // LOAD PROFILE
+        const user = localStorage.getItem('gameUsername');
+        const avatar = localStorage.getItem('gameAvatar');
+        if(!user) window.location.href = 'index.html';
+        document.getElementById('user-name-display').textContent = user;
+        document.getElementById('user-avatar').src = avatar;
+
+        // PRELOAD IMAGES TO PREVENT LAG
+        async function preloadImages() {
+            const urls = ROUND_CONFIGS.map(c => c.img);
+            const promises = urls.map(url => {
+                return new Promise((resolve) => {
+                    const img = new Image();
+                    img.src = url;
+                    img.onload = () => img.decode().then(resolve).catch(resolve);
+                });
+            });
+            await Promise.all(promises);
+            document.getElementById('loader').style.display = 'none';
+            initRound(0);
+        }
+
+        function initRound(idx) {
+            currentIdx = idx;
+            const config = ROUND_CONFIGS[idx];
+            const [cols, rows] = config.grid;
+            correctPiecesCount = cols * rows;
+            piecesPlaced = 0;
+            timeLeft = 60;
+            
+            document.getElementById('cur-round').textContent = idx + 1;
+            document.getElementById('timer-txt').textContent = timeLeft;
+            document.getElementById('target-preview').src = config.img;
+
+            const area = document.getElementById('puzzle-area');
+            const grid = document.getElementById('drop-grid');
+            
+            // Xóa mảnh cũ
+            grid.innerHTML = '';
+            document.querySelectorAll('.puzzle-piece').forEach(p => p.remove());
+
+            // Thiết lập Grid
+            const bSize = 450;
+            const pw = bSize / cols, ph = bSize / rows;
+            grid.style.width = grid.style.height = bSize + 'px';
+            grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+
+            for (let i = 0; i < correctPiecesCount; i++) {
+                const slot = document.createElement('div');
+                slot.className = 'grid-slot';
+                slot.dataset.idx = i;
+                grid.appendChild(slot);
+                createPiece(config.img, i, cols, rows, pw, ph, true);
+            }
+
+            // Mảnh nhiễu (Round 3+)
+            if(config.fakes > 0) {
+                for(let j=0; j<config.fakes; j++) {
+                    const fakeImg = ROUND_CONFIGS[Math.floor(Math.random() * 5)].img;
+                    createPiece(fakeImg, Math.floor(Math.random() * 9), 3, 3, pw, ph, false);
+                }
+            }
+            startTimer();
+        }
+
+        function createPiece(url, idx, cols, rows, w, h, isCorrect) {
+            const p = document.createElement('div');
+            p.className = 'puzzle-piece';
+            p.style.width = w + 'px'; p.style.height = h + 'px';
+            p.style.backgroundImage = `url(${url})`;
+            p.style.backgroundPosition = `-${(idx % cols) * w}px -${Math.floor(idx / cols) * h}px`;
+            p.style.backgroundSize = `${cols * w}px ${rows * h}px`;
+            p.dataset.correctIdx = isCorrect ? idx : -99;
+
+            scatter(p);
+            attachDrag(p);
+            document.getElementById('puzzle-area').appendChild(p);
+        }
+
+        function scatter(el) {
+            const area = document.getElementById('puzzle-area').getBoundingClientRect();
+            const side = Math.random() > 0.5 ? 20 : area.width - 150;
+            const x = side + Math.random() * 50;
+            const y = Math.random() * (area.height - 100);
+            el.style.left = '0px'; el.style.top = '0px';
+            el.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+            el.dataset.x = x; el.dataset.y = y;
+        }
+
+        function attachDrag(el) {
+            let sx, sy, ix, iy;
+            const move = (e) => {
+                const cx = e.touches ? e.touches[0].clientX : e.clientX;
+                const cy = e.touches ? e.touches[0].clientY : e.clientY;
+                el.style.transform = `translate3d(${ix + cx - sx}px, ${iy + cy - sy}px, 0) scale(1.05)`;
+            };
+            const end = () => {
+                window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', end);
+                window.removeEventListener('touchmove', move); window.removeEventListener('touchend', end);
+                checkMatch(el);
+            };
+            const start = (e) => {
+                const cx = e.touches ? e.touches[0].clientX : e.clientX;
+                const cy = e.touches ? e.touches[0].clientY : e.clientY;
+                sx = cx; sy = cy;
+                const matrix = new WebKitCSSMatrix(window.getComputedStyle(el).transform);
+                ix = matrix.m41; iy = matrix.m42;
+                window.addEventListener('mousemove', move); window.addEventListener('mouseup', end);
+                window.addEventListener('touchmove', move, {passive:false}); window.addEventListener('touchend', end);
+            };
+            el.addEventListener('mousedown', start); el.addEventListener('touchstart', start, {passive:false});
+        }
+
+        function checkMatch(el) {
+            const rect = el.getBoundingClientRect();
+            const slots = document.querySelectorAll('.grid-slot');
+            const area = document.getElementById('puzzle-area').getBoundingClientRect();
+            let matched = false;
+
+            slots.forEach(s => {
+                const sr = s.getBoundingClientRect();
+                const cx = rect.left + rect.width/2, cy = rect.top + rect.height/2;
+                if(cx > sr.left && cx < sr.right && cy > sr.top && cy < sr.bottom) {
+                    if(s.dataset.idx === el.dataset.correctIdx) {
+                        el.classList.add('placed');
+                        el.style.transform = `translate3d(${sr.left - area.left}px, ${sr.top - area.top}px, 0)`;
+                        piecesPlaced++; matched = true;
+                        if(piecesPlaced === correctPiecesCount) handleWin();
+                    }
+                }
+            });
+            if(!matched) scatter(el);
+        }
+
+        function startTimer() {
+            clearInterval(timer);
+            timer = setInterval(() => {
+                timeLeft--; document.getElementById('timer-txt').textContent = timeLeft;
+                if(timeLeft <= 0) { clearInterval(timer); document.getElementById('modal-lose').style.display='flex'; }
+            }, 1000);
+        }
+
+        function handleWin() {
+            clearInterval(timer);
+            const spent = 60 - timeLeft; totalTimeUsed += spent;
+            if(currentIdx < 4) {
+                document.getElementById('rc-title').textContent = `Round ${currentIdx+1} Complete`;
+                document.getElementById('rc-time').textContent = spent + 's';
+                document.getElementById('modal-round-complete').style.display = 'flex';
+            } else saveScore();
+        }
+
+        function nextRound() {
+            document.getElementById('modal-round-complete').style.display = 'none';
+            initRound(currentIdx + 1);
+        }
+
+        function saveScore() {
+            let data = JSON.parse(localStorage.getItem('leaderboardData') || '[]');
+            const idx = data.findIndex(u => u.name === user);
+            if(idx !== -1) { if(totalTimeUsed < data[idx].time) data[idx].time = totalTimeUsed; }
+            else data.push({name: user, avatar: avatar, time: totalTimeUsed});
+            data.sort((a,b) => a.time - b.time);
+            localStorage.setItem('leaderboardData', JSON.stringify(data));
+            document.getElementById('win-msg').innerHTML = `Tổng thời gian: ${totalTimeUsed}s<br>Hạng: #${data.findIndex(u=>u.name===user)+1}`;
+            document.getElementById('modal-win').style.display = 'flex';
+        }
+
+        // SNOW EFFECT
+        const canvas = document.getElementById('snow-canvas'), ctx = canvas.getContext('2d');
+        let w, h, flakes = [];
+        function initSnow() { w = canvas.width = window.innerWidth; h = canvas.height = window.innerHeight; flakes = []; for(let i=0; i<100; i++) flakes.push({x:Math.random()*w, y:Math.random()*h, r:Math.random()*2+0.5, sy:Math.random()*1.5+0.5, sx:Math.random()*1-0.5}); }
+        function drawSnow() { ctx.clearRect(0,0,w,h); ctx.fillStyle='rgba(255,255,255,0.8)'; ctx.beginPath(); flakes.forEach(f => { ctx.moveTo(f.x,f.y); ctx.arc(f.x,f.y,f.r,0,Math.PI*2,true); }); ctx.fill(); flakes.forEach(f => { f.y+=f.sy; if(f.y>h){ f.y=0; f.x=Math.random()*w; } }); requestAnimationFrame(drawSnow); }
+        window.addEventListener('resize', initSnow); initSnow(); drawSnow();
+        preloadImages();
+    </script>
+</body>
+</html>

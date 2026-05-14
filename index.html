@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KAST x Pudgy Penguins Puzzle</title>
+    <style>
+        /* CSS Reset & Background */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body, html { width: 100vw; height: 100vh; overflow: hidden; background: linear-gradient(180deg, #c3d3fb 0%, #a2bdf8 100%); font-family: 'Arial Rounded MT Bold', 'Nunito', sans-serif; position: relative; }
+        #snow-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 100; }
+
+        /* --- Header: Logo (Click được về trang chủ) --- */
+        .header { position: absolute; top: 35px; left: 50px; z-index: 10; display: flex; align-items: center; gap: 15px; text-decoration: none; cursor: pointer; }
+        .header .logo-kast { height: 26px; width: auto; }
+        .header .cross { font-size: 18px; font-weight: 900; color: #111; font-family: 'Arial', sans-serif; }
+        .header .logo-pudgy { height: 46px; width: auto; }
+
+        /* --- Cụm góc phải: Profile Avatar & Username --- */
+        .top-right-menu { position: absolute; top: 30px; right: 50px; display: flex; align-items: center; gap: 15px; z-index: 10; }
+        .user-info-group { display: flex; flex-direction: column; align-items: flex-end; }
+        .user-name-display { font-size: 20px; font-weight: 900; color: #1b274f; text-transform: uppercase; }
+        .reset-profile-btn { font-size: 12px; color: #ff4757; cursor: pointer; text-decoration: underline; font-weight: bold; margin-top: 2px; display: none; }
+        .profile-btn { width: 65px; height: 65px; border-radius: 50%; background: #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.1); overflow: hidden; }
+
+        /* --- Middle Left: Text Puzzle --- */
+        .title-section { position: absolute; top: 40%; left: 50px; transform: translateY(-50%); display: flex; align-items: center; z-index: 10; }
+        .title-section img { height: 125px; }
+
+        /* --- Bottom Left: Nút Play --- */
+        .play-btn-wrapper { position: absolute; top: calc(40% + 85px); left: 50px; z-index: 10; }
+        .play-btn { background: url('wood-btn-bg.png') no-repeat center; background-size: contain; width: 320px; height: 105px; border: none; cursor: pointer; transition: transform 0.2s ease-in-out; }
+        .play-btn:hover { transform: scale(1.05); }
+
+        /* --- Leaderboard (Góc trái dưới) --- */
+        .leaderboard-container { position: absolute; bottom: 40px; left: 50px; z-index: 10; }
+        .leaderboard-text { font-size: 22px; font-weight: 900; color: #1b274f; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; transition: color 0.2s ease; text-decoration: none; }
+        .leaderboard-text:hover { color: #fff; }
+
+        /* --- Right Section: Cấu trúc Puzzle & Penguins --- */
+        .right-section { position: absolute; top: 0; bottom: 0; right: 5vw; width: 650px; height: 100vh; z-index: 5; }
+        .puzzle-base { position: absolute; bottom: 12vh; right: 45px; width: 530px; height: auto; z-index: 2; }
+        .penguin-hanging { position: absolute; top: -5px; right: 285px; width: 135px; transform-origin: top center; animation: swingLeftRight 4s ease-in-out infinite alternate; z-index: 3; }
+        .penguin-holding { position: absolute; bottom: calc(12vh - 5px); left: 10px; width: 145px; transform-origin: bottom center; animation: swayLightly 3s ease-in-out infinite alternate; z-index: 4; }
+        .penguin-climbing { position: absolute; bottom: calc(12vh + 15px); right: 100px; width: 95px; z-index: 6; animation: climbDiagonal 6s linear infinite; }
+        .penguin-climbing img { width: 100%; height: auto; animation: legWiggle 0.5s linear infinite alternate; }
+
+        /* --- MODAL (POPUP TẠO PROFILE) --- */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(27, 39, 79, 0.7); z-index: 200; justify-content: center; align-items: center; }
+        .modal-content { background: #fff; padding: 30px 40px; border-radius: 20px; width: 400px; text-align: center; box-shadow: 0 15px 35px rgba(0,0,0,0.2); font-family: 'Nunito', sans-serif; }
+        .modal-content h2 { color: #1b274f; margin-bottom: 20px; }
+        .input-group { margin-bottom: 20px; text-align: left; }
+        .input-group label { display: block; font-weight: bold; color: #1b274f; margin-bottom: 8px; font-size: 14px; }
+        .modal-content input[type="text"] { width: 100%; padding: 12px; border: 2px solid #a2bdf8; border-radius: 10px; font-size: 16px; outline: none; }
+        .modal-content input[type="text"]:focus { border-color: #1b274f; }
+        .modal-content input[type="file"] { width: 100%; padding: 10px 0; font-size: 14px; }
+        .file-hint { font-size: 12px; color: #666; margin-top: -5px; margin-bottom: 20px; }
+        .modal-actions { display: flex; justify-content: space-between; gap: 15px; }
+        .modal-btn { flex: 1; padding: 12px; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .btn-cancel { background: #e0e0e0; color: #333; }
+        .btn-cancel:hover { background: #d0d0d0; }
+        .btn-create { background: #1b274f; color: #fff; }
+        .btn-create:hover { background: #2a3d7a; }
+
+        /* --- ANIMATIONS --- */
+        @keyframes swingLeftRight { 0% { transform: rotate(-5deg); } 100% { transform: rotate(5deg); } }
+        @keyframes swayLightly { 0% { transform: rotate(-3deg) translateX(-2px); } 100% { transform: rotate(3deg) translateX(2px); } }
+        @keyframes climbDiagonal { 0% { transform: translate(0, 0); } 45% { transform: translate(-25px, -260px); } 50% { transform: translate(-25px, -260px); } 95% { transform: translate(0, 0); } 100% { transform: translate(0, 0); } }
+        @keyframes legWiggle { 0% { transform: rotate(-8deg); } 100% { transform: rotate(8deg); } }
+    </style>
+</head>
+<body>
+
+    <canvas id="snow-canvas"></canvas>
+
+    <!-- Header Logo (Dẫn về trang chủ) -->
+    <a href="index.html" class="header">
+        <img src="Kast dark logo.png" alt="Kast" class="logo-kast">
+        <span class="cross">✕</span>
+        <img src="pudgy penguins logo.png" alt="Pudgy Penguins" class="logo-pudgy">
+    </a>
+
+    <!-- Cụm góc phải: Profile Avatar & Tên -->
+    <div class="top-right-menu">
+        <div class="user-info-group">
+            <div class="user-name-display" id="user-name-display"></div>
+            <div class="reset-profile-btn" id="reset-profile-btn">Xóa Profile</div>
+        </div>
+        <div class="profile-btn">
+            <img id="user-avatar" src="avatar-default.png" alt="Profile" style="width:100%; height:100%; object-fit:cover;">
+        </div>
+    </div>
+
+    <!-- Leaderboard góc trái dưới -->
+    <div class="leaderboard-container">
+        <a href="leaderboard.html" class="leaderboard-text">LEADERBOARD</a>
+    </div>
+
+    <div class="title-section"><img src="puzzle-text-icon.png" alt="Puzzle"></div>
+    <div class="play-btn-wrapper"><button class="play-btn" id="play-button"></button></div>
+
+    <!-- Cụm bên phải: Cánh cụt và Khối hình -->
+    <div class="right-section">
+        <img src="center-blocks.png" alt="Blocks" class="puzzle-base">
+        <div class="penguin-hanging"><img src="penguin-hanging.png" style="width: 100%;"></div>
+        <div class="penguin-holding"><img src="penguin-holding-red.png" style="width: 100%;"></div>
+        <div class="penguin-climbing"><img src="penguin-ladder.png"></div>
+    </div>
+
+    <!-- GIAO DIỆN TẠO PROFILE (MODAL) -->
+    <div class="modal-overlay" id="profile-modal">
+        <div class="modal-content">
+            <h2>Create Profile</h2>
+            <div class="input-group">
+                <label for="username-input">Username</label>
+                <input type="text" id="username-input" placeholder="e.g. Player123" maxlength="10">
+                <p class="file-hint" style="margin-top: 5px;">Max 10 chars (A-Z, a-z, 0-9). MUST BE UNIQUE.</p>
+            </div>
+            <div class="input-group">
+                <label for="avatar-input">Avatar Image</label>
+                <input type="file" id="avatar-input" accept="image/png, image/jpeg">
+                <p class="file-hint">Max 1MB (PNG, JPEG). Rec: 100x100px.</p>
+            </div>
+            <div class="modal-actions">
+                <button class="modal-btn btn-cancel" id="cancel-btn">Cancel</button>
+                <button class="modal-btn btn-create" id="create-btn">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- XỬ LÝ PROFILE HIỆN TẠI ---
+        const savedUsername = localStorage.getItem('gameUsername');
+        const savedAvatar = localStorage.getItem('gameAvatar');
+        const userNameDisplay = document.getElementById('user-name-display');
+        const userAvatar = document.getElementById('user-avatar');
+        const resetBtn = document.getElementById('reset-profile-btn');
+
+        // Hiện profile nếu đã lưu
+        if (savedUsername && savedAvatar) {
+            userNameDisplay.textContent = savedUsername;
+            userAvatar.src = savedAvatar;
+            resetBtn.style.display = 'block'; // Hiện nút xóa
+        }
+
+        // Xóa Profile (Chỉ xóa local, giữ nguyên Leaderboard)
+        resetBtn.addEventListener('click', () => {
+            localStorage.removeItem('gameUsername');
+            localStorage.removeItem('gameAvatar');
+            location.reload(); // Tải lại trang hoàn toàn
+        });
+
+        // --- XỬ LÝ LOGIC MODAL TẠO PROFILE ---
+        const playBtn = document.getElementById('play-button');
+        const modal = document.getElementById('profile-modal');
+        
+        playBtn.addEventListener('click', () => {
+            // Nếu đã có profile, cho phép vào game luôn
+            if (localStorage.getItem('gameUsername')) {
+                window.location.href = 'puzzle.html';
+            } else {
+                modal.style.display = 'flex';
+            }
+        });
+
+        document.getElementById('cancel-btn').addEventListener('click', () => {
+            modal.style.display = 'none';
+        });
+
+        document.getElementById('create-btn').addEventListener('click', () => {
+            const usernameInput = document.getElementById('username-input');
+            const avatarInput = document.getElementById('avatar-input');
+            const username = usernameInput.value.trim();
+            const file = avatarInput.files[0];
+
+            // 1. Regex check: Chỉ chữ hoa, thường, số, max 10
+            if (!/^[a-zA-Z0-9]{1,10}$/.test(username)) {
+                alert("Tên không hợp lệ! Chỉ bao gồm chữ, số và tối đa 10 ký tự.");
+                return;
+            }
+
+            // 2. Check trùng tên trong Leaderboard
+            let lbData = JSON.parse(localStorage.getItem('leaderboardData') || '[]');
+            const isNameTaken = lbData.some(u => u.name.toLowerCase() === username.toLowerCase());
+            if (isNameTaken) {
+                alert("Tên này đã có người sử dụng. Vui lòng chọn tên khác!");
+                return;
+            }
+
+            if (!file || !['image/jpeg', 'image/png'].includes(file.type) || file.size > 1048576) {
+                alert("Vui lòng tải ảnh PNG hoặc JPEG hợp lệ (tối đa 1MB).");
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const imgDataUrl = e.target.result;
+                
+                // Lưu vào LocalStorage
+                localStorage.setItem('gameUsername', username);
+                localStorage.setItem('gameAvatar', imgDataUrl);
+
+                userAvatar.src = imgDataUrl;
+                userNameDisplay.textContent = username;
+                modal.style.display = 'none';
+
+                setTimeout(() => {
+                    window.location.href = 'puzzle.html';
+                }, 1000);
+            };
+            reader.readAsDataURL(file);
+        });
+
+        // --- HIỆU ỨNG TUYẾT ---
+        const canvas = document.getElementById('snow-canvas');
+        const ctx = canvas.getContext('2d');
+        let width, height, snowflakes = [];
+        function initSnow() { width = canvas.width = window.innerWidth; height = canvas.height = window.innerHeight; snowflakes = []; for (let i = 0; i < 150; i++) snowflakes.push({ x: Math.random() * width, y: Math.random() * height, r: Math.random() * 2.5 + 0.5, sy: Math.random() * 1.5 + 0.5, sx: Math.random() * 1 - 0.5 }); }
+        function drawSnow() { ctx.clearRect(0, 0, width, height); ctx.fillStyle = 'rgba(255, 255, 255, 0.8)'; ctx.beginPath(); snowflakes.forEach(flake => { ctx.moveTo(flake.x, flake.y); ctx.arc(flake.x, flake.y, flake.r, 0, Math.PI * 2, true); }); ctx.fill(); snowflakes.forEach(flake => { flake.y += flake.sy; flake.x += flake.sx; if (flake.y > height) { flake.y = 0; flake.x = Math.random() * width; } if (flake.x > width) flake.x = 0; else if (flake.x < 0) flake.x = width; }); requestAnimationFrame(drawSnow); }
+        window.addEventListener('resize', initSnow); initSnow(); drawSnow();
+    </script>
+</body>
+</html>

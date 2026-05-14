@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leaderboard - KAST x Pudgy</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body, html { width: 100vw; height: 100vh; overflow: hidden; background: linear-gradient(180deg, #c3d3fb 0%, #a2bdf8 100%); font-family: 'Arial Rounded MT Bold', 'Nunito', sans-serif; }
+        #snow-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 100; }
+
+        /* HEADER */
+        .header { position: absolute; top: 35px; left: 50px; z-index: 10; display: flex; align-items: center; gap: 15px; text-decoration: none; cursor: pointer; }
+        .header .logo-kast { height: 26px; width: auto; }
+        .header .cross { font-size: 18px; font-weight: 900; color: #111; font-family: 'Arial', sans-serif; }
+        .header .logo-pudgy { height: 46px; width: auto; }
+
+        /* PROFILE */
+        .top-right-menu { position: absolute; top: 30px; right: 50px; display: flex; align-items: center; gap: 15px; z-index: 10; }
+        .user-name-display { font-size: 20px; font-weight: 900; color: #1b274f; text-transform: uppercase; }
+        .profile-btn { width: 65px; height: 65px; border-radius: 50%; background: #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.1); overflow: hidden; }
+
+        /* --- BẢNG XẾP HẠNG --- */
+        .lb-wrapper {
+            position: absolute; top: 55%; left: 50%; transform: translate(-50%, -50%);
+            width: 800px; max-width: 90vw; max-height: 80vh; overflow-y: auto;
+            background: rgba(255, 255, 255, 0.95); border-radius: 20px; padding: 40px;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.15); z-index: 10; text-align: center;
+        }
+
+        .lb-wrapper::-webkit-scrollbar { width: 8px; }
+        .lb-wrapper::-webkit-scrollbar-thumb { background: #1b274f; border-radius: 10px; }
+
+        .lb-title { font-size: 36px; color: #1b274f; margin-bottom: 30px; letter-spacing: 2px; text-transform: uppercase;}
+
+        .lb-table { width: 100%; border-collapse: collapse; }
+        .lb-table th { background: #1b274f; color: #fff; padding: 15px; font-size: 18px; text-transform: uppercase; position: sticky; top: 0;}
+        .lb-table th:first-child { border-top-left-radius: 10px; border-bottom-left-radius: 10px; }
+        .lb-table th:last-child { border-top-right-radius: 10px; border-bottom-right-radius: 10px; }
+        
+        .lb-table td { padding: 15px; font-size: 20px; font-weight: bold; color: #333; border-bottom: 2px solid #e0e0e0; }
+        
+        .rank-1 td { color: #ff9f43; font-size: 24px; }
+        .rank-2 td { color: #54a0ff; }
+        .rank-3 td { color: #1dd1a1; }
+        
+        /* Hiển thị chú thích You're here */
+        .you-are-here { color: #ff4757; font-size: 14px; margin-left: 10px; vertical-align: middle; }
+        .empty-msg { font-size: 18px; color: #666; margin-top: 20px; display: none; }
+    </style>
+</head>
+<body>
+
+    <canvas id="snow-canvas"></canvas>
+    
+    <a href="index.html" class="header">
+        <img src="Kast dark logo.png" alt="Kast">
+        <span class="cross">✕</span>
+        <img src="pudgy penguins logo.png" alt="Pudgy Penguins">
+    </a>
+
+    <div class="top-right-menu">
+        <div class="user-name-display" id="user-name-display"></div>
+        <div class="profile-btn"><img id="user-avatar" src="avatar-default.png" style="width:100%; height:100%; object-fit:cover;"></div>
+    </div>
+
+    <!-- Khung Bảng xếp hạng -->
+    <div class="lb-wrapper">
+        <h2 class="lb-title">🏆 TOP 100 LEADERBOARD 🏆</h2>
+        <table class="lb-table">
+            <thead>
+                <tr>
+                    <th>Rank</th>
+                    <th>Username</th>
+                    <th>Total Time</th>
+                </tr>
+            </thead>
+            <tbody id="lb-body"></tbody>
+        </table>
+        <div class="empty-msg" id="empty-msg">Chưa có dữ liệu. Hãy là người đầu tiên chinh phục!</div>
+    </div>
+
+    <script>
+        // LOAD PROFILE CHUNG
+        const savedUsername = localStorage.getItem('gameUsername');
+        const savedAvatar = localStorage.getItem('gameAvatar');
+        
+        if (savedUsername) {
+            document.getElementById('user-name-display').textContent = savedUsername;
+            document.getElementById('user-avatar').src = savedAvatar;
+        }
+
+        // RENDER LEADERBOARD
+        const lbBody = document.getElementById('lb-body');
+        const emptyMsg = document.getElementById('empty-msg');
+        let lbData = JSON.parse(localStorage.getItem('leaderboardData') || '[]');
+
+        if (lbData.length === 0) {
+            emptyMsg.style.display = 'block';
+        } else {
+            // Sắp xếp người tốn ít thời gian lên đầu
+            lbData.sort((a, b) => a.time - b.time);
+            
+            // CẮT ĐÚNG TOP 100 ĐỂ HIỂN THỊ
+            const top100 = lbData.slice(0, 100);
+
+            top100.forEach((record, index) => {
+                const rank = index + 1;
+                const tr = document.createElement('tr');
+                if (rank <= 3) tr.className = `rank-${rank}`;
+
+                // So sánh tên để biết rank của người dùng đang đăng nhập
+                const isMe = (savedUsername && record.name === savedUsername) ? `<span class="you-are-here">(You're here)</span>` : "";
+
+                tr.innerHTML = `
+                    <td>#${rank}</td>
+                    <td>${record.name} ${isMe}</td>
+                    <td>${record.time}s</td>
+                `;
+                lbBody.appendChild(tr);
+            });
+        }
+
+        // TUYẾT RƠI
+        const canvas = document.getElementById('snow-canvas'), ctx = canvas.getContext('2d');
+        let w, h, flakes = [];
+        function initSnow() { w = canvas.width = window.innerWidth; h = canvas.height = window.innerHeight; flakes = []; for(let i=0; i<150; i++) flakes.push({x:Math.random()*w, y:Math.random()*h, r:Math.random()*2.5+0.5, sy:Math.random()*1.5+0.5, sx:Math.random()*1-0.5}); }
+        function drawSnow() { ctx.clearRect(0,0,w,h); ctx.fillStyle='rgba(255,255,255,0.8)'; ctx.beginPath(); flakes.forEach(f => { ctx.moveTo(f.x,f.y); ctx.arc(f.x,f.y,f.r,0,Math.PI*2,true); }); ctx.fill(); flakes.forEach(f => { f.y+=f.sy; f.x+=f.sx; if(f.y>h){ f.y=0; f.x=Math.random()*w; } if(f.x>w)f.x=0; else if(f.x<0)f.x=w; }); requestAnimationFrame(drawSnow); }
+        window.addEventListener('resize', initSnow); initSnow(); drawSnow();
+    </script>
+</body>
+</html>
